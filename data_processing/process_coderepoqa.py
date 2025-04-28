@@ -1,16 +1,27 @@
 import os
 import json
+import random
 import pandas as pd
 
 # Path to your downloaded and extracted CodeRepoQA Python folder
 base_path = './dataset/CodeRepoQA_Python'
+if not os.path.exists(base_path):
+    print(f"File {base_path} does not exist!")
+    exit(1)
 
 questions = []
 answers = []
 
 for root, dirs, files in os.walk(base_path):
-    for file in files:
-        if file.endswith('.json'):
+    if not dirs:
+        json_files = [f for f in files if f.endswith('.json')]
+        if not json_files:
+            continue
+
+        file_count = max(1, len(json_files) // 10)
+        sampled_files = random.sample(json_files, file_count)
+
+        for file in sampled_files:
             file_path = os.path.join(root, file)
             try:
                 with open(file_path, 'r') as f:
@@ -59,6 +70,8 @@ df_coderepoqa_python = pd.DataFrame({
 })
 
 # Save to CSV
-output_csv_path = './dataset/coderepoqa_python.csv'
+dataset_dir = "./dataset"
+output_csv_path = os.path.join(dataset_dir, 'coderepoqa_python.csv')
+os.makedirs(dataset_dir, exist_ok=True)
 df_coderepoqa_python.to_csv(output_csv_path, index=False, quoting=1, escapechar='\\')
 print(f"Saved processed data to {output_csv_path}")
