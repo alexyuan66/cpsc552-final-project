@@ -1,9 +1,3 @@
-"""
-This is for evaluating on coderepoqa
-"""
-!pip install rouge-score
-!pip install python-Levenshtein
-
 # 2. Import libraries
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from rouge_score import rouge_scorer
@@ -26,9 +20,9 @@ def evaluate_predictions(predictions, ground_truths):
     edit_similarities = []
 
     for pred, gt in zip(predictions, ground_truths):
-        # BLEU score
-        pred_tokens = nltk.word_tokenize(pred.lower())
-        gt_tokens = nltk.word_tokenize(gt.lower())
+        # BLEU score (simple whitespace split)
+        pred_tokens = pred.lower().split()
+        gt_tokens   = gt.lower().split()
         bleu = sentence_bleu([gt_tokens], pred_tokens, smoothing_function=smooth_fn)
         bleu_scores.append(bleu)
 
@@ -43,9 +37,9 @@ def evaluate_predictions(predictions, ground_truths):
 
     # Aggregate results
     results = {
-        'BLEU': sum(bleu_scores) / len(bleu_scores),
-        'ROUGE-1': sum(rouge1_scores) / len(rouge1_scores),
-        'ROUGE-L': sum(rougeL_scores) / len(rougeL_scores),
+        'BLEU':            sum(bleu_scores)       / len(bleu_scores),
+        'ROUGE-1':         sum(rouge1_scores)     / len(rouge1_scores),
+        'ROUGE-L':         sum(rougeL_scores)     / len(rougeL_scores),
         'Edit Similarity': sum(edit_similarities) / len(edit_similarities)
     }
     return results
