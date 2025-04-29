@@ -7,19 +7,6 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
 
-# =====================================================================
-# EXAMPLE USAGE:
-# =====================================================================
-#
-# if __name__ == "__main__":
-#     query1 = 'How do I fix an index out of range error in Python?'
-#     query2 = 'How do I concatenate two strings in Python?'
-
-#     rag = RAG()
-#     print(rag.retrieve(query1))
-#     print(rag.retrieve(query2))
-
-
 class RAG:
     def __init__(self, dataset='../dataset/question_answer.csv'):
         self.dataset = dataset
@@ -122,3 +109,16 @@ class RAG:
             concatenated_results.append('\n')
 
         return '\n'.join(concatenated_results)
+    
+
+# =====================================================================
+# EXAMPLE USAGE:
+# =====================================================================
+#
+# if __name__ == "__main__":
+#     query1 = 'How do I fix an index out of range error in Python?'
+#     query2 = 'How do I concatenate two strings in Python?'
+
+#     rag = RAG()
+#     print(rag.retrieve(query1))
+#     print(rag.retrieve(query2))
