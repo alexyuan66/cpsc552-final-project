@@ -2,92 +2,123 @@
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 import faiss
-import numpy as np
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
-def retrieve_semantic(df, query, tag_keywords, model, index, top_k=5, boost_factor=5):
-    """
-    Retrieve relevant question-answer pairs given a query
-    """
 
-    results = []
+# =====================================================================
+# EXAMPLE USAGE:
+# =====================================================================
+#
+# if __name__ == "__main__":
+#     query1 = 'How do I fix an index out of range error in Python?'
+#     query2 = 'How do I concatenate two strings in Python?'
 
-    # Encode query
-    query_embedding = model.encode([query], normalize_embeddings=True)
+#     rag = RAG()
+#     print(rag.retrieve(query1))
+#     print(rag.retrieve(query2))
+
+
+class RAG:
+    def __init__(self, dataset='../dataset/question_answer.csv'):
+        self.dataset = dataset
+        self.df = pd.read_csv(dataset)
+
+        nltk.download('punkt')
+        nltk.download('stopwords')
+        nltk.download('punkt_tab')
+
+        # Preprocess everything
+        self.df['text'] = self.df['question_title'].fillna('') + " " + self.df['question_body'].fillna('') # concatenates question and body
+        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+
+        # Encode questions
+        print("Encoding all questions...")
+        corpus_embeddings = self.model.encode(self.df['text'].tolist(), show_progress_bar=True, normalize_embeddings=True)
+
+        # FAISS index
+        d = corpus_embeddings.shape[1]
+        self.index = faiss.IndexFlatIP(d) # cosine similarity
+        self.index.add(corpus_embeddings)
+        print(f"Finished indexing {len(corpus_embeddings)} question-answer pairs")
+
     
-    # Search similar questions
-    D, I = index.search(query_embedding, top_k * 2)
-    
-    # Iterate through all similar questions
-    for idx, score in zip(I[0], D[0]):
-        # Skip if no match
-        if idx == -1:
-            continue
+    def __retrieve_semantic(self, query, tag_keywords, top_k=5, boost_factor=5):
+        """
+        Util function that retrieves relevant question-answer pairs given a query
+        """
+
+        results = []
+
+        # Encode query
+        query_embedding = self.model.encode([query], normalize_embeddings=True)
+        
+        # Search similar questions
+        D, I = self.index.search(query_embedding, top_k * 2)
+        
+        # Iterate through all similar questions
+        for idx, score in zip(I[0], D[0]):
+            # Skip if no match
+            if idx == -1:
+                continue
+                
+            item = {
+                'question_title': self.df.iloc[idx]['question_title'],
+                'question_body': self.df.iloc[idx]['question_body'],
+                'answer_body': self.df.iloc[idx]['answer_body'],
+                'tags': self.df.iloc[idx]['question_tags'],
+                'semantic_score': score
+            }
             
-        item = {
-            'question_title': df.iloc[idx]['question_title'],
-            'question_body': df.iloc[idx]['question_body'],
-            'answer_body': df.iloc[idx]['answer_body'],
-            'tags': df.iloc[idx]['question_tags'],
-            'semantic_score': score
-        }
+            # Boost score if the question's tags match the desired keywords
+            tags = str(self.df.iloc[idx]['question_tags']).lower()
+            for keyword in tag_keywords:
+                if keyword in tags:
+                    item['semantic_score'] += boost_factor
+                    break  # Boost once per keyword match
+            
+            results.append(item)
         
-        # Boost score if the question's tags match the desired keywords
-        tags = str(df.iloc[idx]['question_tags']).lower()
-        for keyword in tag_keywords:
-            if keyword in tags:
-                item['semantic_score'] += boost_factor
-                break  # Boost once per keyword match
-        
-        results.append(item)
+        # Get results
+        results = sorted(results, key=lambda x: x['semantic_score'], reverse=True)
+        return results[:top_k]
     
-    # Get results
-    results = sorted(results, key=lambda x: x['semantic_score'], reverse=True)
-    return results[:top_k]
 
-def extract_keywords_from_query(query):
-    """
-    Extract important keywords from a users query
-    """
+    def __extract_keywords_from_query(self, query):
+        """
+        Util function that extracts important keywords from a user's query
+        """
 
-    tokens = word_tokenize(query.lower())
-    stop_words = set(stopwords.words('english'))
-    keywords = [token for token in tokens if token.isalnum() and token not in stop_words]
-    return keywords
+        tokens = word_tokenize(query.lower())
+        stop_words = set(stopwords.words('english'))
+        keywords = [token for token in tokens if token.isalnum() and token not in stop_words]
+        return keywords
+    
 
-def main(dataset, query, tag_keywords):
-    # Preprocess everything
-    df = pd.read_csv(dataset)
-    df['text'] = df['question_title'].fillna('') + " " + df['question_body'].fillna('') # concatenates question and body
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    def retrieve(self, query, top_k=5):
+        """
+        Retrieve top k most relevant question-answer pairs from the given dataset given a query.
 
-    # Encode questions
-    print("Encoding all questions...")
-    corpus_embeddings = model.encode(df['text'].tolist(), show_progress_bar=True, normalize_embeddings=True)
+        Args:
+            query (str): The query to process.
+            dataset (str): Dataset to find question-answer pairs from.
 
-    # FAISS index
-    d = corpus_embeddings.shape[1]
-    index = faiss.IndexFlatIP(d) # cosine similarity
-    index.add(corpus_embeddings)
-    print(f"Finished indexing {len(corpus_embeddings)} question-answer pairs")
+        Returns:
+            str: Concatenated string containing the top k most relevant question-answer pairs.
+        """
+        
+        tag_keywords = self.__extract_keywords_from_query(query)
 
-    # Get results and display
-    results = retrieve_semantic(df, query, tag_keywords, model, index, top_k=5)
-    for r in results:
-        print("="*100)
-        print("QUESTION:", r['question_title'])
-        print("TAGS:", r['tags'])
-        print("ANSWER:", r['answer_body'])
-        print("SCORE:", r['semantic_score'])
+        # Get results and concatenate
+        results = self.__retrieve_semantic(query, tag_keywords, top_k)
 
+        concatenated_results = []
+        for i, r in enumerate(results):
+            concatenated_results.append(f'{i})')
+            concatenated_results.append(f"Question: {r['question_title']}")
+            concatenated_results.append(f"Tags: {r['tags'].replace('|', ', ')}")
+            concatenated_results.append(f"Answer: {r['answer_body']}")
+            concatenated_results.append('\n')
 
-
-if __name__ == "__main__":
-    nltk.download('punkt')
-    nltk.download('stopwords')
-    dataset = './dataset/question_answer.csv'
-    query = 'How do I fix an index out of range error in Python?'
-    tag_keywords = extract_keywords_from_query(query)
-    main(dataset, query, tag_keywords)
+        return '\n'.join(concatenated_results)
