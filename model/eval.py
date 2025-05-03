@@ -6,6 +6,10 @@ import argparse
 import torch
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+import math
+
+
+from open_coder import OpenCoder
 
 # Increase CSV field size limit to handle large fields
 csv.field_size_limit(sys.maxsize)
@@ -91,35 +95,108 @@ def load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, ma
     return gen_pipeline
 
 
-def run_evaluation(csv_path, gen_pipeline, batch_size=8, limit=None):
+import re
+
+DEFAULT_JUDGE_PROMPT = (
+    "Output a score to rate the two answers from 0 (least similar) to 1 "
+    "(most similar). Format your answer with LaTeX, like this: \\boxed{score}."
+)
+
+def LLM_judge(judge_pipeline, predicted: str, ground_truth: str,
+              judge_prompt: str = DEFAULT_JUDGE_PROMPT) -> float:
     """
-    Read (question, answer) pairs from csv_path, generate model predictions
-    using batched inference via the provided generation pipeline, and evaluate
-    them via evaluate_predictions.
+    Ask an LLM‐judge to score similarity between *predicted* and *ground_truth*.
+
+    Args
+    ----
+    judge_pipeline : a text‑generation pipeline or CustomPipeline
+    predicted      : model output string
+    ground_truth   : reference answer string
+    judge_prompt   : system prompt that explains the boxed‑score format
+
+    Returns
+    -------
+    float          : extracted score in [0, 1]  (NaN if not found)
+    """
+    full_prompt = (
+        f"{judge_prompt}\n\n"
+        f"Answer 1 (model prediction):\n{predicted}\n\n"
+        f"Answer 2 (ground‑truth):\n{ground_truth}\n"
+    )
+
+    # Pipeline always expects a *batch* in this repo
+    raw = judge_pipeline([full_prompt])[0]
+    if isinstance(raw, list):          # CustomPipeline returns list[list[dict]]
+        raw_text = raw[0]["generated_text"]
+    elif isinstance(raw, dict):
+        raw_text = raw["generated_text"]
+    else:                              # plain string or other
+        raw_text = str(raw)
+
+    # Extract \boxed{…}
+    print(raw_text)
+    m = re.search(r"\\boxed\{ *([\d.]+) *\}", raw_text)
+    return float(m.group(1)) if m else float("nan")
+
+
+
+def run_evaluation(csv_path,
+                   gen_pipeline,
+                   batch_size=8,
+                   limit=None,
+                   judge_pipeline=None,
+                   judge_prompt=DEFAULT_JUDGE_PROMPT):
+    """
+    Generate answers and (optionally) have an LLM judge rate them.
     """
 
-    df = pd.read_csv(csv_path, encoding='utf-8', on_bad_lines='skip')
-    print(df.head())
-    questions = df["question"].fillna("").tolist()
-    ground_truths = df["answer"].fillna("").tolist()
+    df = pd.read_csv(csv_path, encoding="utf-8", on_bad_lines="skip")
+    questions      = df["question"].fillna("").tolist()
+    ground_truths  = df["answer"].fillna("").tolist()
 
     if limit is not None:
-        questions = questions[:limit]
-        ground_truths = ground_truths[:limit]
+        questions      = questions[:limit]
+        ground_truths  = ground_truths[:limit]
 
+    # ---------- generation ----------
     predictions = []
     total = len(questions)
     for start in range(0, total, batch_size):
-        end = min(start + batch_size, total)
-        batch_questions = questions[start:end]
-        print(f"Processing questions {start + 1} to {end} of {total}")
-        batch_results = gen_pipeline(batch_questions)
-        for result in batch_results:
+        end   = min(start + batch_size, total)
+        batch = questions[start:end]
+        print(f"Processing questions {start+1}–{end} / {total}")
+        batch_out = gen_pipeline(batch)
+        for result in batch_out:
             predictions.append(result[0]["generated_text"].strip())
 
+    # ---------- reference metrics ----------
     metrics = evaluate_predictions(predictions, ground_truths)
+
+    # ---------- optional LLM‑judge ----------
+    if judge_pipeline is not None:
+        judge_scores = [
+            LLM_judge(judge_pipeline, pred, gt, judge_prompt)
+            for pred, gt in zip(predictions, ground_truths)
+        ]
+
+        # keep only finite numbers
+        valid = [s for s in judge_scores if not math.isnan(s)]
+
+        if valid:                       # at least one usable score
+            metrics["LLM_judge_mean"] = sum(valid) / len(valid)
+            metrics["LLM_judge_n"]    = len(valid)   # (optional) how many kept
+        else:                           # every score was NaN
+            metrics["LLM_judge_mean"] = float("nan")
+            metrics["LLM_judge_n"]    = 0
+
     print(metrics)
     return metrics
+
+
+
+def load_opencoder_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, cot=False):
+    return OpenCoder(load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7), use_cot=cot)
+
 
 
 if __name__ == "__main__":
@@ -127,7 +204,10 @@ if __name__ == "__main__":
         description="Evaluate a QA model on the CodeRepoQA Python dataset with GPU batching."
     )
     parser.add_argument("--model", type=str,
-                        default="mistralai/Mistral-7B-Instruct-v0.2",
+                        default="microsoft/phi-2",
+                        help="Model name or path for text generation")
+    parser.add_argument("--judge_model", type=str,
+                        default="Qwen/Qwen1.5-7B-Chat",
                         help="Model name or path for text generation")
     parser.add_argument("--csv", type=str,
                         default="../dataset/coderepoqa_python.csv",
@@ -140,7 +220,23 @@ if __name__ == "__main__":
                         help="Optional limit on number of samples for quick testing")
     args = parser.parse_args()
 
-    print('Loading generation pipeline...')
+    print('Loading base generation pipeline...')
     gen_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
-    print('Running batched evaluation...')
-    run_evaluation(args.csv, gen_pipeline, batch_size=args.batch_size, limit=args.limit)
+
+    print('Loading OpenCoder generation pipeline (no CoT)...')
+    oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size)
+
+    print('Loading OpenCoder generation pipeline (with CoT)...')
+    cot_oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, cot=True)
+
+    print('Loading judge pipeline...')
+    judge_pipeline = load_generation_pipeline(args.judge_model, batch_size=args.batch_size)
+
+    print('\n\nRunning batched evaluation on base...')
+    run_evaluation(args.csv, gen_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+
+    print('\n\nRunning batched evaluation on OpenCoder (no CoT)...')
+    run_evaluation(args.csv, oc_gen_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+
+    print('\n\nRunning batched evaluation on OpenCoder (with CoT)...')
+    run_evaluation(args.csv, cot_oc_gen_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
