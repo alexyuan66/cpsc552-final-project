@@ -4,6 +4,7 @@ import sys
 import csv
 import argparse
 import torch
+import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 # Increase CSV field size limit to handle large fields
@@ -16,8 +17,39 @@ sys.path.insert(0, os.path.join(script_dir, '../data_processing'))
 # Import the evaluation function from the data_processing directory
 from coderepoqa_evaluation import evaluate_predictions
 
+# custom pipline class that is callable in the same way as transformers.pipeline
+# purpose: for truncating inputs to the max input length allowed by model, and for more control
+class CustomPipeline:
+    def __init__(self, model, tokenizer, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, batch_size=8):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.max_input_tokens = max_input_tokens
+        self.max_new_tokens = max_new_tokens
+        self.temperature = temperature
+        self.batch_size = batch_size
 
-def load_generation_pipeline(model_name, batch_size=8, max_new_tokens=256, temperature=0.7):
+    def __call__(self, prompts):
+        all_outputs = []
+
+        for i in range(0, len(prompts), self.batch_size):
+            batch_questions = prompts[i:i + self.batch_size]
+            inputs = self.tokenizer(batch_questions, return_tensors="pt", padding=True, truncation=True, max_length=self.max_input_tokens).to(self.model.device)
+
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=True, 
+                temperature=self.temperature,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
+
+            decoded = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            for text in decoded:
+                all_outputs.append([{"generated_text": text}])
+
+        return all_outputs
+
+def load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7):
     """
     Load a text-generation pipeline for the specified model, handling
     authentication, device placement, and padding for batching.
@@ -28,6 +60,8 @@ def load_generation_pipeline(model_name, batch_size=8, max_new_tokens=256, tempe
         model_name,
         token=hf_token,
         trust_remote_code=True,
+        padding_side='left',
+
     )
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -36,21 +70,24 @@ def load_generation_pipeline(model_name, batch_size=8, max_new_tokens=256, tempe
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
         device_map="auto" if torch.cuda.is_available() else None,
     )
+    #model.to("cpu")
 
     # Ensure tokenizer has a pad token for batching
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = model.config.eos_token_id
 
     # Create a text-generation pipeline with batching enabled
-    gen_pipeline = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        device_map="auto" if torch.cuda.is_available() else None,
-        batch_size=batch_size,
-        max_new_tokens=max_new_tokens,
-        temperature=temperature,
-    )
+   # gen_pipeline = pipeline(
+   #     "text-generation",
+   #     model=model,
+   #     tokenizer=tokenizer,
+   #     device_map="auto" if torch.cuda.is_available() else None,
+   #     batch_size=batch_size,
+   #     max_new_tokens=max_new_tokens,
+   #     do_sample=True,
+   #     temperature=temperature,
+   # )
+    gen_pipeline = CustomPipeline(model, tokenizer, max_input_tokens, max_new_tokens, temperature, batch_size)
     return gen_pipeline
 
 
@@ -60,13 +97,11 @@ def run_evaluation(csv_path, gen_pipeline, batch_size=8, limit=None):
     using batched inference via the provided generation pipeline, and evaluate
     them via evaluate_predictions.
     """
-    questions = []
-    ground_truths = []
-    with open(csv_path, newline='') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            questions.append(row["question"])
-            ground_truths.append(row["answer"])
+
+    df = pd.read_csv(csv_path, encoding='utf-8', on_bad_lines='skip')
+    print(df.head())
+    questions = df["question"].fillna("").tolist()
+    ground_truths = df["answer"].fillna("").tolist()
 
     if limit is not None:
         questions = questions[:limit]

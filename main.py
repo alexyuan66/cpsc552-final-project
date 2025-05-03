@@ -1,4 +1,4 @@
-from .model.open_coder import OpenCoder
+from model.open_coder import OpenCoder
 
 
 if __name__ == "__main__":
