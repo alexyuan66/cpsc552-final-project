@@ -32,7 +32,12 @@ class CustomPipeline:
         self.temperature = temperature
         self.batch_size = batch_size
 
+    @torch.inference_mode()
     def __call__(self, prompts):
+        # Accept either "one prompt" or ["prompt1", …]
+        if isinstance(prompts, str):
+            prompts = [prompts]
+
         all_outputs = []
 
         for i in range(0, len(prompts), self.batch_size):
@@ -74,6 +79,15 @@ def load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, ma
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
         device_map="auto" if torch.cuda.is_available() else None,
     )
+
+    # model = AutoModelForCausalLM.from_pretrained(
+    # model_name,
+    # attn_implementation="flash_attention_2",   # ≈1.8 × speed‑up if supported
+    # torch_dtype=torch.float16,
+    # device_map="auto",
+    # )
+    torch.backends.cuda.matmul.allow_tf32 = True    # small boost on Ampere+
+    model = torch.compile(model)                   # PyTorch 2.x, nvFuser
     #model.to("cpu")
 
     # Ensure tokenizer has a pad token for batching
@@ -134,7 +148,7 @@ def LLM_judge(judge_pipeline, predicted: str, ground_truth: str,
         raw_text = str(raw)
 
     # Extract \boxed{…}
-    print(raw_text)
+    # print(raw_text)
     m = re.search(r"\\boxed\{ *([\d.]+) *\}", raw_text)
     return float(m.group(1)) if m else float("nan")
 
@@ -165,9 +179,18 @@ def run_evaluation(csv_path,
         end   = min(start + batch_size, total)
         batch = questions[start:end]
         print(f"Processing questions {start+1}–{end} / {total}")
+
         batch_out = gen_pipeline(batch)
         for result in batch_out:
-            predictions.append(result[0]["generated_text"].strip())
+            # Accept: "answer", [{"generated_text": …}], or {"generated_text": …}
+            if isinstance(result, str):
+                predictions.append(result.strip())
+            elif isinstance(result, list):
+                predictions.append(result[0]["generated_text"].strip())
+            elif isinstance(result, dict):
+                predictions.append(result["generated_text"].strip())
+            else:                       # fall‑back – stringify whatever it is
+                predictions.append(str(result).strip())
 
     # ---------- reference metrics ----------
     metrics = evaluate_predictions(predictions, ground_truths)

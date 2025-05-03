@@ -1,0 +1,77 @@
+Loading base generation pipeline...
+Loading OpenCoder generation pipeline (no CoT)...
+Encoding all questions...
+Finished indexing 15953 question-answer pairs
+Loading OpenCoder generation pipeline (with CoT)...
+Encoding all questions...
+Finished indexing 15953 question-answer pairs
+Loading judge pipeline...
+
+
+Running batched evaluation on base...
+Processing questions 1–8 / 150
+Processing questions 9–16 / 150
+Processing questions 17–24 / 150
+Processing questions 25–32 / 150
+Processing questions 33–40 / 150
+Processing questions 41–48 / 150
+Processing questions 49–56 / 150
+Processing questions 57–64 / 150
+Processing questions 65–72 / 150
+Processing questions 73–80 / 150
+Processing questions 81–88 / 150
+Processing questions 89–96 / 150
+Processing questions 97–104 / 150
+Processing questions 105–112 / 150
+Processing questions 113–120 / 150
+Processing questions 121–128 / 150
+Processing questions 129–136 / 150
+Processing questions 137–144 / 150
+Processing questions 145–150 / 150
+{'BLEU': 0.0029499049686183194, 'ROUGE-1': 0.08427789264509843, 'ROUGE-L': 0.04830160995192405, 'Edit Similarity': 0.1346167639347251, 'LLM_judge_mean': 0.8350000000000003, 'LLM_judge_n': 60}
+
+
+Running batched evaluation on OpenCoder (no CoT)...
+Processing questions 1–8 / 150
+Processing questions 9–16 / 150
+Processing questions 17–24 / 150
+Processing questions 25–32 / 150
+Processing questions 33–40 / 150
+Processing questions 41–48 / 150
+Processing questions 49–56 / 150
+Processing questions 57–64 / 150
+Processing questions 65–72 / 150
+Processing questions 73–80 / 150
+Processing questions 81–88 / 150
+Processing questions 89–96 / 150
+Processing questions 97–104 / 150
+Processing questions 105–112 / 150
+Processing questions 113–120 / 150
+Processing questions 121–128 / 150
+Processing questions 129–136 / 150
+Processing questions 137–144 / 150
+Processing questions 145–150 / 150
+{'BLEU': 0.0012309215205910892, 'ROUGE-1': 0.04073494854684147, 'ROUGE-L': 0.0250112174882333, 'Edit Similarity': 0.05444133893861633, 'LLM_judge_mean': 0.8138235294117645, 'LLM_judge_n': 34}
+
+
+Running batched evaluation on OpenCoder (with CoT)...
+Processing questions 1–8 / 150
+Processing questions 9–16 / 150
+Processing questions 17–24 / 150
+Processing questions 25–32 / 150
+Processing questions 33–40 / 150
+Processing questions 41–48 / 150
+Processing questions 49–56 / 150
+Processing questions 57–64 / 150
+Processing questions 65–72 / 150
+Processing questions 73–80 / 150
+Processing questions 81–88 / 150
+Processing questions 89–96 / 150
+Processing questions 97–104 / 150
+Processing questions 105–112 / 150
+Processing questions 113–120 / 150
+Processing questions 121–128 / 150
+Processing questions 129–136 / 150
+Processing questions 137–144 / 150
+Processing questions 145–150 / 150
+{'BLEU': 0.0012147543949355215, 'ROUGE-1': 0.041985801620253185, 'ROUGE-L': 0.02538735134203099, 'Edit Similarity': 0.0556995477898625, 'LLM_judge_mean': 0.8706896551724138, 'LLM_judge_n': 29}

@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from prompts import GENERATE_INITIAL_RESPONSE_PROMPT, GENERATE_FEEDBACK_PROMPT, GENERATE_REFINED_RESPONSE_PROMPT
+from prompts import *
 
 from rag import RAG
 
@@ -16,11 +16,47 @@ class OpenCoder:
         self.rag = RAG()
         self.use_cot = use_cot
 
-    def __call__(self, query: str, max_feedback=5):
-        return self.generate(query, max_feedback)
-    
+    def __call__(self, queries, max_feedback=5):
+        # Accept str or list[str] so run_evaluation can pass a batch
+        if isinstance(queries, str):
+            return self._generate_one(queries, max_feedback)
+        return self._generate_batch(queries, max_feedback)
 
-    def generate(self, query: str, max_feedback=5):
+    # -------- NEW: fully GPU‑batched generation --------
+    def _generate_batch(self, queries, max_feedback=5):
+        # 1 · RAG retrieval for every question
+        rag_data = self.rag.retrieve_batch(queries)
+
+        # 2 · Initial answers (single GPU call)
+        init_prompts = [
+            (COT_GENERATE_INITIAL_RESPONSE_PROMPT if self.use_cot else GENERATE_INITIAL_RESPONSE_PROMPT).format(
+                question=q, rag_data=r)
+            for q, r in zip(queries, rag_data)
+        ]
+        init_out = self.pipeline(init_prompts)
+        initial = [x[0]["generated_text"] for x in init_out]
+
+        # 3 · Feedback (single GPU call)
+        fb_prompts = [
+            (COT_GENERATE_FEEDBACK_PROMPT if self.use_cot else GENERATE_FEEDBACK_PROMPT).format(
+                max_feedback=max_feedback, question=q,
+                initial_response=ir, rag_data=r)
+            for q, ir, r in zip(queries, initial, rag_data)
+        ]
+        fb_out = self.pipeline(fb_prompts)
+        feedback = [x[0]["generated_text"] for x in fb_out]
+
+        # 4 · Refinement (single GPU call)
+        ref_prompts = [
+            (COT_GENERATE_REFINED_RESPONSE_PROMPT if self.use_cot else GENERATE_REFINED_RESPONSE_PROMPT).format(
+                question=q, initial_response=ir,
+                feedback=fb, rag_data=r)
+            for q, ir, fb, r in zip(queries, initial, feedback, rag_data)
+        ]
+        ref_out = self.pipeline(ref_prompts)
+        return [x[0]["generated_text"] for x in ref_out]
+
+    def _generate_one(self, query: str, max_feedback=5):
         """
         Generate a response to a query using the OpenCoder framework, which adapts the OpenScholar
         framework (https://arxiv.org/pdf/2411.14199) to specialize in answering questions in the field
