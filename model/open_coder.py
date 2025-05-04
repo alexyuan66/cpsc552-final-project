@@ -6,7 +6,7 @@ from rag import RAG
 
 
 class OpenCoder:
-    def __init__(self, pipeline: Callable, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False):
+    def __init__(self, pipeline: Callable, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
         """
         Args:
             pipeline (function): A LLM model's prompting function that inputs a prompt (str) and outputs
@@ -15,6 +15,7 @@ class OpenCoder:
         self.pipeline = pipeline
         self.rag = RAG()
         self.use_cot = use_cot
+        self.use_naive = use_naive
         self.rerank_initial = rerank_initial
         self.rerank_refined = rerank_refined
 
@@ -52,7 +53,7 @@ class OpenCoder:
     # -------- NEW: fully GPU‑batched generation --------
     def _generate_batch(self, queries, max_feedback=5):
         # 1 · RAG retrieval for every question
-        rag_data = self.rag.retrieve_batch(queries)
+        rag_data = self.rag.retrieve_batch(queries) if not self.use_naive else self.rag.retrieve_batch_naive(queries)
 
         # 2 · Initial answers (single GPU call)
         init_prompts = [
@@ -112,7 +113,7 @@ class OpenCoder:
             str: A response to the query generated using the OpenCoder framework.
         """
         # 1) Retrieve most relevant Stack Overflow QA points
-        rag_data = self.rag.retrieve_batch(query)
+        rag_data = self.rag.retrieve_batch(query)if not self.use_naive else self.rag.retrieve_batch_naive(query)
 
         # 2) Generate initial response using both the query and RAG data
         if self.use_cot:

@@ -2,7 +2,6 @@
 import os
 import sys
 import csv
-import argparse
 import torch
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
@@ -217,59 +216,6 @@ def run_evaluation(csv_path,
 
 
 
-def load_opencoder_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, cot=False, rerank_initial=False, rerank_refined=False):
-    return OpenCoder(load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7), use_cot=cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined)
+def load_opencoder_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, cot=False, rerank_initial=False, rerank_refined=False, use_naive=False):
+    return OpenCoder(load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7), use_cot=cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined, use_naive=use_naive)
 
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Evaluate a QA model on the CodeRepoQA Python dataset with GPU batching."
-    )
-    parser.add_argument("--model", type=str,
-                        default="microsoft/phi-2",
-                        help="Model name or path for text generation")
-    parser.add_argument("--judge_model", type=str,
-                        default="Qwen/Qwen1.5-7B-Chat",
-                        help="Model name or path for text generation")
-    parser.add_argument("--csv", type=str,
-                        default="../dataset/coderepoqa_python.csv",
-                        help="Path to the CSV file with 'question' and 'answer' columns")
-    parser.add_argument("--batch_size", type=int,
-                        default=8,
-                        help="Number of questions to process in parallel on GPU")
-    parser.add_argument("--limit", type=int,
-                        default=None,
-                        help="Optional limit on number of samples for quick testing")
-    args = parser.parse_args()
-
-    # print('Loading base generation pipeline...')
-    # gen_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
-
-    print('Loading judge pipeline...')
-    judge_pipeline = load_generation_pipeline(args.judge_model, batch_size=args.batch_size)
-
-    # Tonight: rerank init (no CoT), rerank init (with CoT), rerank refined (no CoT)
-    # Tomorrow morning: rerank refined (with CoT), naive RAG (no CoT), naive RAG (with CoT)
-
-    print('loading opencoder generation pipeline (rerank init, no CoT)...')
-    rerank_init_gen_pipeline_no_cot = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_initial=True, cot=False)
-
-    print('loading opencoder generation pipeline (rerank init, with CoT)...')
-    rerank_init_gen_pipeline_with_cot = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_initial=True, cot=True)
-
-    print('loading opencoder generation pipeline (rerank refined, no CoT)...')
-    rerank_refined_gen_pipeline_no_cot = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_refined=True, cot=False)
-
-
-
-    print('\n\nRunning batched evaluation (rerank init, no CoT)...')
-    run_evaluation(args.csv, rerank_init_gen_pipeline_no_cot, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
-
-    print('\n\nRunning batched evaluation (rerank init, with CoT)...')
-    run_evaluation(args.csv, rerank_init_gen_pipeline_with_cot, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
-
-    print('\n\nRunning batched evaluation (rerank refined, no CoT)...')
-    run_evaluation(args.csv, rerank_refined_gen_pipeline_no_cot, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
-
-   

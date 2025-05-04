@@ -5,6 +5,8 @@ import faiss
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 
@@ -25,11 +27,15 @@ class RAG:
         print("Encoding all questions...")
         corpus_embeddings = self.model.encode(self.df['text'].tolist(), show_progress_bar=True, normalize_embeddings=True)
 
-        # FAISS index
+        # FAISS index for sentence transformer retrieval
         d = corpus_embeddings.shape[1]
         self.index = faiss.IndexFlatIP(d) # cosine similarity
         self.index.add(corpus_embeddings)
         print(f"Finished indexing {len(corpus_embeddings)} question-answer pairs")
+
+        # TF-IDF matrix over dataset for naive retrieval
+        self.vectorizer = TfidfVectorizer(stop_words='english')
+        self.tfidf_matrix = self.vectorizer.fit_transform(self.df['text'].tolist())
 
     def _retrieve_semantic_from_embedding(
         self,
@@ -111,7 +117,7 @@ class RAG:
 
     def retrieve(self, query, top_k=5):
         """
-        Retrieve top k most relevant question-answer pairs from the given dataset given a query.
+        Retrieve top k most relevant question-answer pairs from the given dataset given a query using sentence transformer.
 
         Args:
             query (str): The query to process.
@@ -121,10 +127,10 @@ class RAG:
             str: Concatenated string containing the top k most relevant question-answer pairs.
         """
         
-        tag_keywords = self.__extract_keywords_from_query(query)
+        tag_keywords = self._extract_keywords_batch(query)
 
         # Get results and concatenate
-        results = self.__retrieve_semantic(query, tag_keywords, top_k)
+        results = self.__retrieve_semantic_batch(query, tag_keywords, top_k)
 
         concatenated_results = []
         for i, r in enumerate(results):
@@ -132,6 +138,35 @@ class RAG:
             concatenated_results.append(f"Question: {r['question_title']}")
             concatenated_results.append(f"Tags: {r['tags'].replace('|', ', ')}")
             concatenated_results.append(f"Answer: {r['answer_body']}")
+            concatenated_results.append('\n')
+
+        return '\n'.join(concatenated_results)
+
+    def retrieve_naive(self, query, top_k=5):
+        """
+        Retrieve top k most relevant question-answer pairs from the given dataset given a query using naive TF-IDF matrix.
+
+        Args:
+            query (str): The query to process.
+
+        Returns:
+            str: Concatenated string containing the top k most relevant question-answer pairs.
+        """
+        query_vec = self.vectorizer.transform([query])
+        scores = cosine_similarity(query_vec, self.tfidf_matrix)[0]
+
+        top_indices = scores.argsort()[::-1][:top_k]
+
+        concatenated_results = []
+        for i, idx in enumerate(top_indices):
+            question_title = self.df.iloc[idx]['question_title']
+            tags = self.df.iloc[idx]['question_tags']
+            answer_body = self.df.iloc[idx]['answer_body']
+
+            concatenated_results.append(f"{i})")
+            concatenated_results.append(f"Question: {question_title}")
+            concatenated_results.append(f"Tags: {tags.replace('|', ', ')}")
+            concatenated_results.append(f"Answer: {answer_body}")
             concatenated_results.append('\n')
 
         return '\n'.join(concatenated_results)
@@ -186,6 +221,63 @@ class RAG:
             scored = scored[:top_k]
 
             # pretty‑print exactly like before
+            parts = []
+            for j, r in enumerate(scored):
+                parts.append(f"{j})")
+                parts.append(f"Question: {r['question_title']}")
+                parts.append(f"Tags: {r['tags'].replace('|', ', ')}")
+                parts.append(f"Answer: {r['answer_body']}")
+                parts.append("")  # blank line
+            formatted_out.append("\n".join(parts))
+
+        return formatted_out
+
+    def retrieve_batch_naive(self, queries: list[str], top_k=5):
+        """
+        Retrieve from a batch of queries using TF-IDF (naive method).
+
+        Args:
+            queries (list[str]) : list of questions
+            top_k (int)         : how many Q‑A pairs per query to return
+
+        Returns:
+            list[str] : one formatted string per original query
+        """
+        if not isinstance(queries, (list, tuple)):
+            raise TypeError("`queries` must be a list/tuple of strings.")
+
+        # 1. Transform all queries into TF-IDF vectors
+        q_vecs = self.vectorizer.transform(queries)
+
+        # 2. Extract keywords from each query
+        kw_lists = [self._extract_keywords_batch(q) for q in queries]
+
+        # 3. Score and format
+        formatted_out = []
+        for qi, (q_vec, kw) in enumerate(zip(q_vecs, kw_lists)):
+            scores = cosine_similarity(q_vec, self.tfidf_matrix)[0]
+            top_indices = scores.argsort()[::-1][:top_k * 2]
+
+            scored = []
+            for idx in top_indices:
+                item = {
+                    "question_title": self.df.iloc[idx]["question_title"],
+                    "question_body": self.df.iloc[idx]["question_body"],
+                    "answer_body": self.df.iloc[idx]["answer_body"],
+                    "tags": self.df.iloc[idx]["question_tags"],
+                    "semantic_score": float(scores[idx]),  # reusing the same key
+                }
+                tags = str(item["tags"]).lower()
+                for k in kw:
+                    if k in tags:
+                        item["semantic_score"] += 5
+                        break
+                scored.append(item)
+
+            scored.sort(key=lambda x: x["semantic_score"], reverse=True)
+            scored = scored[:top_k]
+
+            # Format
             parts = []
             for j, r in enumerate(scored):
                 parts.append(f"{j})")
