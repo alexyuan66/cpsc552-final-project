@@ -130,7 +130,6 @@ Avoid new redundancies and ensure the final answer references Stack Overflow m
 {rag_data}
 """
 
-# Fixed reranker prompts with escaped braces
 RERANKER_GENERATE_BETTER_RESPONSE_PROMPT = """
 You are given:
 
@@ -154,13 +153,13 @@ Retrieved Context:
 {rag_data}
 
 Response A:
-{{response_a}}
+{response_a}
 
 Response B:
-{{response_b}}
+{response_b}
 
 Your Evaluation:
-Which response is better? Please respond with either "A" or "B".
+Which response is better? Please respond with \boxed{answer}, where answer is either A or B.
 """
 
 RERANKER_GENERATE_BETTER_REFINED_PROMPT = """
@@ -195,12 +194,12 @@ Retrieved Context:
 {rag_data}
 
 Refined Response A:
-{{response_a}}
+{response_a}
 
 Refined Response B:
-{{response_b}}
+{response_b}
 
 Your Evaluation:
-Which refined response is better? Please respond with either "A" or "B".
+Which refined response is better? Please respond with \boxed{answer}, where answer is either A or B.
 """
 

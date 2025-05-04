@@ -3,6 +3,7 @@ from collections.abc import Callable
 from model.prompts import *
 
 from model.rag import RAG
+import re
 
 
 def escape_curly_braces(text: str) -> str:
@@ -48,13 +49,18 @@ class OpenCoder:
         # prompted to output A or B for which response is better
         final_out = []
         for i, better in enumerate(better_responses_ind):
-            better_stripped = better.strip('"')
-            if better_stripped == "A":
-                final_out.append(responses[0][i])
-            elif better_stripped == "B":
-                final_out.append(responses[1][i])
+            match = re.search(r'\\boxed\{(A|B)\}', content)
+            if match:
+                letter = match.group(1)
+                if letter == 'A':
+                    final_out.append(responses[0][i])
+                elif letter == 'B':
+                    final_out.append(responses[1][i])
+                else:
+                    print(f"ERROR: Reranker response \\boxed{{{letter}}} does not match expected format of A or B")
+                    final_out.append(responses[0][i])
             else:
-                print(f"ERROR: Reranker response {better} does not match expected format of A or B")
+                print("Neither \\boxed{A} nor \\boxed{B} found")
                 final_out.append(responses[0][i])
 
         return final_out
@@ -75,8 +81,6 @@ class OpenCoder:
                 RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(
                     query=q,
                     rag_data=escape_curly_braces(r),
-                    response_a="{response_a}",
-                    response_b="{response_b}"
                 )
                 for q, r in zip(queries, rag_data)
             ]
