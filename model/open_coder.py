@@ -36,7 +36,13 @@ class OpenCoder:
             out_arr = [x[0]["generated_text"] for x in out]
             responses.append(out_arr)
 
-        rerank_prompts = [ s.format(response_a = ra, response_b = rb) for s, ra, rb in zip(rerank_prompt_templates, responses[0], responses[1]) ] 
+        rerank_prompts = [
+            s.format(
+                response_a=escape_curly_braces(ra),
+                response_b=escape_curly_braces(rb)
+            )
+            for s, ra, rb in zip(rerank_prompt_templates, responses[0], responses[1])
+        ]
         reranked_out = self.pipeline(rerank_prompts)
         better_responses_ind = [x[0]["generated_text"] for x in reranked_out]
         # prompted to output A or B for which response is better
