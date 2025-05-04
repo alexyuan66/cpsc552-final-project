@@ -46,7 +46,7 @@ class OpenCoder:
         # prompted to output A or B for which response is better
         final_out = []
         for i, better in enumerate(better_responses_ind):
-            match = re.search(r'\\boxed\{(A|B)\}', content)
+            match = re.search(r'\\boxed\{(A|B)\}', better)
             if match:
                 letter = match.group(1)
                 if letter == 'A':
@@ -58,6 +58,7 @@ class OpenCoder:
                     final_out.append(responses[0][i])
             else:
                 print("Neither \\boxed{A} nor \\boxed{B} found")
+                print("LLM out: better")
                 final_out.append(responses[0][i])
 
         return final_out
