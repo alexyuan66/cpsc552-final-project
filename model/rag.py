@@ -13,9 +13,12 @@ import numpy as np
 
 
 class RAG:
-    def __init__(self, dataset='./dataset/question_answer.csv'):
+    def __init__(self, dataset='./dataset/question_answer.csv', limit=None):
         self.dataset = dataset
-        self.df = pd.read_csv(dataset)
+        if limit is not None:
+            self.df = pd.read_csv(dataset, nrows=limit)
+        else:
+            self.df = pd.read_csv(dataset)
 
         nltk.download('punkt')
         nltk.download('stopwords')

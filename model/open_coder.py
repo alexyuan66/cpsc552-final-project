@@ -10,14 +10,14 @@ def escape_curly_braces(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
 class OpenCoder:
-    def __init__(self, pipeline: Callable):
+    def __init__(self, pipeline: Callable, limit=None):
         """
         Args:
             pipeline (function): A LLM model's prompting function that inputs a prompt (str) and outputs
                                  a response (str).
         """
         self.pipeline = pipeline
-        self.rag = RAG()
+        self.rag = RAG(limit=limit)
 
     def __call__(self, queries, max_feedback=5, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
         # Accept str or list[str] so run_evaluation can pass a batch
@@ -36,7 +36,8 @@ class OpenCoder:
         rerank_prompts = [
             s.format(
                 response_a=escape_curly_braces(ra),
-                response_b=escape_curly_braces(rb)
+                response_b=escape_curly_braces(rb),
+                answer="{answer}",
             )
             for s, ra, rb in zip(rerank_prompt_templates, responses[0], responses[1])
         ]
@@ -77,6 +78,9 @@ class OpenCoder:
                 RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(
                     query=q,
                     rag_data=escape_curly_braces(r),
+                    response_a="{response_a}",
+                    response_b="{response_b}",
+                    answer="{answer}",
                 )
                 for q, r in zip(queries, rag_data)
             ]
@@ -106,7 +110,11 @@ class OpenCoder:
         ]
         if rerank_refined:
             rerank_prompts = [
-                RERANKER_GENERATE_BETTER_REFINED_PROMPT.format(query=q, rag_data=r, initial_response=ir, feedback = fb)
+                RERANKER_GENERATE_BETTER_REFINED_PROMPT.format(query=q, rag_data=r, initial_response=ir, feedback = fb,
+                    response_a="{response_a}",
+                    response_b="{response_b}",
+                    answer="{answer}",
+                )
                 for q, r, ir, fb in zip(queries, rag_data, initial, feedback)
             ]
             ref_out_final = self._rerank_2(ref_prompts, rerank_prompts)

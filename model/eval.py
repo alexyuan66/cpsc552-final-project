@@ -163,7 +163,7 @@ def run_evaluation(csv_path,
     Generate answers and (optionally) have an LLM judge rate them.
     """
 
-    df = pd.read_csv(csv_path, encoding="utf-8", on_bad_lines="skip")
+    df = pd.read_csv(csv_path, encoding="utf-8", on_bad_lines="skip", nrows=100)
     questions      = df["question"].fillna("").tolist()
     ground_truths  = df["answer"].fillna("").tolist()
 
@@ -179,7 +179,7 @@ def run_evaluation(csv_path,
         batch = questions[start:end]
         print(f"Processing questions {start+1}–{end} / {total}")
 
-        batch_out = gen_pipeline(batch, use_cot=use_cot, rerank_initial=rerank_inital, rerank_refined=rerank_refined, use_naive=use_naive)
+        batch_out = gen_pipeline(batch, use_cot=use_cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined, use_naive=use_naive)
         for result in batch_out:
             # Accept: "answer", [{"generated_text": …}], or {"generated_text": …}
             if isinstance(result, str):
@@ -216,7 +216,7 @@ def run_evaluation(csv_path,
 
 
 
-def load_opencoder_generation_pipeline(base_pipeline):
+def load_opencoder_generation_pipeline(base_pipeline, limit=None):
     ## DO NOT INITIALIZE ANOTHER PIPELINE, ADDING TOO MUCH BLOAT
-    return OpenCoder(base_pipeline)
+    return OpenCoder(base_pipeline, limit)
 

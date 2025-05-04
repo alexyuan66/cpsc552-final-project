@@ -39,7 +39,7 @@ if __name__ == "__main__":
    # print('loading opencoder generation pipeline (rerank refined, no cot)...')
 
     print('loading opencoder generation pipeline...')
-    opencoder_pipeline = load_opencoder_generation_pipeline(base_pipeline)
+    opencoder_pipeline = load_opencoder_generation_pipeline(base_pipeline, limit=args.limit)
     
     
     print('\n\nRunning batched evaluation on OpenCoder (rerank init, no cot)...')
