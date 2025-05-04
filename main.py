@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int,
                         default=None,
                         help="Optional limit on number of samples for quick testing")
-    # args = parser.parse_args()
+    args = parser.parse_args()
 
     # print('Loading base generation pipeline...')
     # gen_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
