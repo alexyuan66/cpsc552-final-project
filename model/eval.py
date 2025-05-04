@@ -216,7 +216,7 @@ def run_evaluation(csv_path,
 
 
 
-def load_opencoder_generation_pipeline(model_name, base_pipeline):
+def load_opencoder_generation_pipeline(base_pipeline):
     ## DO NOT INITIALIZE ANOTHER PIPELINE, ADDING TOO MUCH BLOAT
     return OpenCoder(base_pipeline)
 
