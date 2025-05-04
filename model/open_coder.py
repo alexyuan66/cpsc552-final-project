@@ -62,11 +62,12 @@ class OpenCoder:
             for q, r in zip(queries, rag_data)
         ]
         if self.rerank_initial:
-            rerank_prompts = [
-                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(query=q, rag_data=r)
+            rerank_prompt_templates = [
+                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(query=q, rag_data=r, response_a="{response_a}", response_b="{response_b}")
                 for q, r in zip(queries, rag_data)
             ]
-            initial = self._rerank_2(init_prompts, rerank_prompts)
+            initial = self._rerank_2(init_prompts, rerank_prompt_templates)
+
         else:
             init_out = self.pipeline(init_prompts)
             initial = [x[0]["generated_text"] for x in init_out]
