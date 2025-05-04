@@ -11,7 +11,7 @@ import numpy as np
 
 
 class RAG:
-    def __init__(self, dataset='../dataset/question_answer.csv'):
+    def __init__(self, dataset='./dataset/question_answer.csv'):
         self.dataset = dataset
         self.df = pd.read_csv(dataset)
 
