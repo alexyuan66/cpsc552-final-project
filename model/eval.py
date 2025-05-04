@@ -243,29 +243,33 @@ if __name__ == "__main__":
                         help="Optional limit on number of samples for quick testing")
     args = parser.parse_args()
 
-    print('Loading base generation pipeline...')
-    gen_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
-
-   # print('loading opencoder generation pipeline (rerank init)...')
-   # oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_initial=True)
-
-   # print('loading opencoder generation pipeline (rerank refined)...')
-   # oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_refined = True)
-
-    print('loading opencoder generation pipeline (no cot)...')
-    oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size)
-
-    print('Loading OpenCoder generation pipeline (with CoT)...')
-    cot_oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, cot=True)
+    # print('Loading base generation pipeline...')
+    # gen_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
 
     print('Loading judge pipeline...')
     judge_pipeline = load_generation_pipeline(args.judge_model, batch_size=args.batch_size)
 
-    print('\n\nRunning batched evaluation on base...')
-    run_evaluation(args.csv, gen_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+    # Tonight: rerank init (no CoT), rerank init (with CoT), rerank refined (no CoT)
+    # Tomorrow morning: rerank refined (with CoT), naive RAG (no CoT), naive RAG (with CoT)
 
-    print('\n\nRunning batched evaluation on OpenCoder (no CoT)...')
-    run_evaluation(args.csv, oc_gen_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+    print('loading opencoder generation pipeline (rerank init, no CoT)...')
+    rerank_init_gen_pipeline_no_cot = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_initial=True, cot=False)
 
-    print('\n\nRunning batched evaluation on OpenCoder (with CoT)...')
-    run_evaluation(args.csv, cot_oc_gen_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+    print('loading opencoder generation pipeline (rerank init, with CoT)...')
+    rerank_init_gen_pipeline_with_cot = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_initial=True, cot=True)
+
+    print('loading opencoder generation pipeline (rerank refined, no CoT)...')
+    rerank_refined_gen_pipeline_no_cot = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_refined=True, cot=False)
+
+
+
+    print('\n\nRunning batched evaluation (rerank init, no CoT)...')
+    run_evaluation(args.csv, rerank_init_gen_pipeline_no_cot, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+
+    print('\n\nRunning batched evaluation (rerank init, with CoT)...')
+    run_evaluation(args.csv, rerank_init_gen_pipeline_with_cot, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+
+    print('\n\nRunning batched evaluation (rerank refined, no CoT)...')
+    run_evaluation(args.csv, rerank_refined_gen_pipeline_no_cot, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline)
+
+   
