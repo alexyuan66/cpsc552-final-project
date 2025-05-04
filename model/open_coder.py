@@ -58,7 +58,7 @@ class OpenCoder:
                     final_out.append(responses[0][i])
             else:
                 print("Neither \\boxed{A} nor \\boxed{B} found")
-                print("LLM out: better")
+                print(f"LLM out: {better}")
                 final_out.append(responses[0][i])
 
         return final_out
