@@ -217,8 +217,8 @@ def run_evaluation(csv_path,
 
 
 
-def load_opencoder_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, cot=False):
-    return OpenCoder(load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7), use_cot=cot)
+def load_opencoder_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, cot=False, rerank_initial=False, rerank_refined=False):
+    return OpenCoder(load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7), use_cot=cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined)
 
 
 
@@ -246,7 +246,13 @@ if __name__ == "__main__":
     print('Loading base generation pipeline...')
     gen_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
 
-    print('Loading OpenCoder generation pipeline (no CoT)...')
+   # print('loading opencoder generation pipeline (rerank init)...')
+   # oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_initial=True)
+
+   # print('loading opencoder generation pipeline (rerank refined)...')
+   # oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size, rerank_refined = True)
+
+    print('loading opencoder generation pipeline (no cot)...')
     oc_gen_pipeline = load_opencoder_generation_pipeline(args.model, batch_size=args.batch_size)
 
     print('Loading OpenCoder generation pipeline (with CoT)...')

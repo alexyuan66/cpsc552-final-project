@@ -6,7 +6,7 @@ from rag import RAG
 
 
 class OpenCoder:
-    def __init__(self, pipeline: Callable, use_cot: bool = False):
+    def __init__(self, pipeline: Callable, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False):
         """
         Args:
             pipeline (function): A LLM model's prompting function that inputs a prompt (str) and outputs
@@ -15,12 +15,39 @@ class OpenCoder:
         self.pipeline = pipeline
         self.rag = RAG()
         self.use_cot = use_cot
+        self.rerank_initial = rerank_initial
+        self.rerank_refined = rerank_refined
 
     def __call__(self, queries, max_feedback=5):
         # Accept str or list[str] so run_evaluation can pass a batch
         if isinstance(queries, str):
             return self._generate_one(queries, max_feedback)
         return self._generate_batch(queries, max_feedback)
+
+    # ask model to generate 2 repsonses and decide which among them is better
+    def _rerank_2(self, prompts, rerank_prompt_templates):
+        responses = []
+        for i in range(2):
+            out = self.pipeline(prompts)
+            out_arr = [x[0]["generated_text"] for x in out]
+            responses.append(out_arr)
+
+        rerank_prompts = [ s.format(response_a = ra, response_b = rb) for s, ra, rb in zip(rerank_prompt_templates, responses[0], responses[1]) ] 
+        reranked_out = self.pipeline(rerank_prompts)
+        better_responses_ind = [x[0]["generated_text"] for x in reranked_out]
+        # prompted to output A or B for which response is better
+        final_out = []
+        for i, better in enumerate(better_responses_ind):
+            better_stripped = better.strip('"')
+            if better_stripped == "A":
+                final_out.append(responses[0][i])
+            elif better_stripped == "B":
+                final_out.append(responses[1][i])
+            else:
+                print(f"ERROR: Reranker response {better} does not match expected format of A or B")
+                final_out.append(responses[0][i])
+
+        return final_out
 
     # -------- NEW: fully GPU‑batched generation --------
     def _generate_batch(self, queries, max_feedback=5):
@@ -33,8 +60,15 @@ class OpenCoder:
                 question=q, rag_data=r)
             for q, r in zip(queries, rag_data)
         ]
-        init_out = self.pipeline(init_prompts)
-        initial = [x[0]["generated_text"] for x in init_out]
+        if self.rerank_initial:
+            rerank_prompts = [
+                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(query=q, rag_data=r)
+                for q, r in zip(queries, rag_data)
+            ]
+            initial = self._rerank_2(init_prompts, rerank_prompts)
+        else:
+            init_out = self.pipeline(init_prompts)
+            initial = [x[0]["generated_text"] for x in init_out]
 
         # 3 · Feedback (single GPU call)
         fb_prompts = [
@@ -53,8 +87,16 @@ class OpenCoder:
                 feedback=fb, rag_data=r)
             for q, ir, fb, r in zip(queries, initial, feedback, rag_data)
         ]
-        ref_out = self.pipeline(ref_prompts)
-        return [x[0]["generated_text"] for x in ref_out]
+        if self.rerank_refined:
+            rerank_prompts = [
+                RERANKER_GENERATE_BETTER_REFINED_PROMPT.format(query=q, rag_data=r, initial_response=ir, feedback = fb)
+                for q, r, ir, fb in zip(queries, rag_data, initial, feedback)
+            ]
+            ref_out_final = self._rerank_2(ref_prompts, rerank_prompts)
+        else:   
+            ref_out = self.pipeline(ref_prompts)
+            ref_out_final = [x[0]["generated_text"] for x in ref_out]
+        return ref_out_final
 
     def _generate_one(self, query: str, max_feedback=5):
         """

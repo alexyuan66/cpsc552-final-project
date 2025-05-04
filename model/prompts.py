@@ -135,3 +135,76 @@ Avoid new redundancies and ensure the final answer references Stack Overflow m
 **Relevant Stack Overflow Excerpts**  
 {rag_data}
 """
+
+RERANKER_GENERATE_BETTER_RESPONSE_PROMPT = """
+You are given:
+
+1. A user query.
+2. Two generated responses: Response A and Response B.
+3. Relevant retrieved context from a knowledge base (RAG data).
+
+Your task is to evaluate both responses in light of the retrieved context and determine which one is better at answering the user query.
+
+Please follow these guidelines:
+- Consider factual accuracy: Which response aligns better with the retrieved context?
+- Consider relevance: Which response addresses the user's query more directly?
+- Consider clarity and completeness: Which response explains the answer more thoroughly and understandably?
+
+Now, evaluate the following:
+
+User Query:
+{query}
+
+Retrieved Context:
+{rag_data}
+
+Response A:
+{response_a}
+
+Response B:
+{response_b}
+
+Your Evaluation:
+Which response is better? Please respond with either "A" or "B".
+"""
+
+RERANKER_GENERATE_BETTER_REFINED_PROMPT = """
+You are given:
+
+1. A user query.
+2. An initial generated response
+3. Feedback on the response
+4. Relevant retrieved context from a knowledge base (RAG data).
+5. Two sets of refined responses generated based on the feedback
+
+Your task is to evaluate both refined responses in light of the retrieved context, initial response, and feedback and determine which refined response better answers the user query and takes the feedback into account.
+
+Please follow these guidelines:
+- Feedback incorporation: Which response more effectively addresses the specific feedback?
+- Context alignment: Which response better reflects the facts in the retrieved context?
+- Query relevance: Which response more directly and completely answers the user query?
+- Clarity and fluency: Which response is clearer and more well-structured?
+
+Now, evaluate the following:
+
+User Query:
+{query}
+
+Initial Response:
+{initial_response}
+
+Feedback:
+{feedback}
+
+Retrieved Context:
+{rag_data}
+
+Refined Response A:
+{response_a}
+
+Refined Response B:
+{response_b}
+
+Your Evaluation:
+Which refined response is better? Please respond with either "A" or "B".
+"""
