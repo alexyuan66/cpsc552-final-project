@@ -5,6 +5,9 @@ from model.prompts import *
 from model.rag import RAG
 
 
+def escape_curly_braces(text: str) -> str:
+    return text.replace("{", "{{").replace("}", "}}")
+
 class OpenCoder:
     def __init__(self, pipeline: Callable, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
         """
@@ -63,9 +66,15 @@ class OpenCoder:
         ]
         if self.rerank_initial:
             rerank_prompt_templates = [
-                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(query=q, rag_data=r, response_a="{response_a}", response_b="{response_b}")
+                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(
+                    query=q,
+                    rag_data=escape_curly_braces(r),
+                    response_a="{response_a}",
+                    response_b="{response_b}"
+                )
                 for q, r in zip(queries, rag_data)
             ]
+
             initial = self._rerank_2(init_prompts, rerank_prompt_templates)
 
         else:
