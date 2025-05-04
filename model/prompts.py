@@ -49,11 +49,7 @@ List of Relevant Stack Overflow Questions and Answers:
 {rag_data}
 """
 
-
-
-
-
-# Prompt 1 ── initial answer generation, now with explicit CoT guidance
+# CoT-enhanced versions
 COT_GENERATE_INITIAL_RESPONSE_PROMPT = """
 You are an expert software‑engineering mentor.  
 Follow the two‑phase approach below:
@@ -77,7 +73,6 @@ Do **not** reveal your hidden reasoning.
 {rag_data}
 """
 
-# Prompt 2 ── feedback generation with CoT; variable renamed as requested
 COT_GENERATE_FEEDBACK_PROMPT = """
 You are a meticulous answer reviewer.  
 First think step‑by‑step (privately) about weaknesses in the draft, then output up to {max_feedback} short, actionable feedback bullets.
@@ -105,7 +100,6 @@ First think step‑by‑step (privately) about weaknesses in the draft, then out
 {rag_data}
 """
 
-# Prompt 3 ── answer refinement with CoT guidance
 COT_GENERATE_REFINED_RESPONSE_PROMPT = """
 Act as an answer‑improvement assistant.  
 Proceed in two phases:
@@ -136,6 +130,7 @@ Avoid new redundancies and ensure the final answer references Stack Overflow m
 {rag_data}
 """
 
+# Fixed reranker prompts with escaped braces
 RERANKER_GENERATE_BETTER_RESPONSE_PROMPT = """
 You are given:
 
@@ -159,10 +154,10 @@ Retrieved Context:
 {rag_data}
 
 Response A:
-{response_a}
+{{response_a}}
 
 Response B:
-{response_b}
+{{response_b}}
 
 Your Evaluation:
 Which response is better? Please respond with either "A" or "B".
@@ -200,11 +195,12 @@ Retrieved Context:
 {rag_data}
 
 Refined Response A:
-{response_a}
+{{response_a}}
 
 Refined Response B:
-{response_b}
+{{response_b}}
 
 Your Evaluation:
 Which refined response is better? Please respond with either "A" or "B".
 """
+
