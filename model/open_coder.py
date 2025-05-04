@@ -10,7 +10,7 @@ def escape_curly_braces(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
 class OpenCoder:
-    def __init__(self, pipeline: Callable, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
+    def __init__(self, pipeline: Callable):
         """
         Args:
             pipeline (function): A LLM model's prompting function that inputs a prompt (str) and outputs
@@ -18,16 +18,12 @@ class OpenCoder:
         """
         self.pipeline = pipeline
         self.rag = RAG()
-        self.use_cot = use_cot
-        self.use_naive = use_naive
-        self.rerank_initial = rerank_initial
-        self.rerank_refined = rerank_refined
 
-    def __call__(self, queries, max_feedback=5):
+    def __call__(self, queries, max_feedback=5, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
         # Accept str or list[str] so run_evaluation can pass a batch
         if isinstance(queries, str):
             return self._generate_one(queries, max_feedback)
-        return self._generate_batch(queries, max_feedback)
+        return self._generate_batch(queries, max_feedback, use_cot, rerank_initial, rerank_refined, use_naive)
 
     # ask model to generate 2 repsonses and decide which among them is better
     def _rerank_2(self, prompts, rerank_prompt_templates):
@@ -66,17 +62,17 @@ class OpenCoder:
         return final_out
 
     # -------- NEW: fully GPU‑batched generation --------
-    def _generate_batch(self, queries, max_feedback=5):
+    def _generate_batch(self, queries, max_feedback=5, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
         # 1 · RAG retrieval for every question
-        rag_data = self.rag.retrieve_batch(queries) if not self.use_naive else self.rag.retrieve_batch_naive(queries)
+        rag_data = self.rag.retrieve_batch(queries) if not use_naive else self.rag.retrieve_batch_naive(queries)
 
         # 2 · Initial answers (single GPU call)
         init_prompts = [
-            (COT_GENERATE_INITIAL_RESPONSE_PROMPT if self.use_cot else GENERATE_INITIAL_RESPONSE_PROMPT).format(
+            (COT_GENERATE_INITIAL_RESPONSE_PROMPT if use_cot else GENERATE_INITIAL_RESPONSE_PROMPT).format(
                 question=q, rag_data=r)
             for q, r in zip(queries, rag_data)
         ]
-        if self.rerank_initial:
+        if rerank_initial:
             rerank_prompt_templates = [
                 RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(
                     query=q,
@@ -93,7 +89,7 @@ class OpenCoder:
 
         # 3 · Feedback (single GPU call)
         fb_prompts = [
-            (COT_GENERATE_FEEDBACK_PROMPT if self.use_cot else GENERATE_FEEDBACK_PROMPT).format(
+            (COT_GENERATE_FEEDBACK_PROMPT if use_cot else GENERATE_FEEDBACK_PROMPT).format(
                 max_feedback=max_feedback, question=q,
                 initial_response=ir, rag_data=r)
             for q, ir, r in zip(queries, initial, rag_data)
@@ -103,12 +99,12 @@ class OpenCoder:
 
         # 4 · Refinement (single GPU call)
         ref_prompts = [
-            (COT_GENERATE_REFINED_RESPONSE_PROMPT if self.use_cot else GENERATE_REFINED_RESPONSE_PROMPT).format(
+            (COT_GENERATE_REFINED_RESPONSE_PROMPT if use_cot else GENERATE_REFINED_RESPONSE_PROMPT).format(
                 question=q, initial_response=ir,
                 feedback=fb, rag_data=r)
             for q, ir, fb, r in zip(queries, initial, feedback, rag_data)
         ]
-        if self.rerank_refined:
+        if rerank_refined:
             rerank_prompts = [
                 RERANKER_GENERATE_BETTER_REFINED_PROMPT.format(query=q, rag_data=r, initial_response=ir, feedback = fb)
                 for q, r, ir, fb in zip(queries, rag_data, initial, feedback)

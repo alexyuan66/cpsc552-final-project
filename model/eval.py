@@ -158,7 +158,7 @@ def run_evaluation(csv_path,
                    batch_size=8,
                    limit=None,
                    judge_pipeline=None,
-                   judge_prompt=DEFAULT_JUDGE_PROMPT):
+                   judge_prompt=DEFAULT_JUDGE_PROMPT, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
     """
     Generate answers and (optionally) have an LLM judge rate them.
     """
@@ -179,7 +179,7 @@ def run_evaluation(csv_path,
         batch = questions[start:end]
         print(f"Processing questions {start+1}–{end} / {total}")
 
-        batch_out = gen_pipeline(batch)
+        batch_out = gen_pipeline(batch, use_cot=use_cot, rerank_initial=rerank_inital, rerank_refined=rerank_refined, use_naive=use_naive)
         for result in batch_out:
             # Accept: "answer", [{"generated_text": …}], or {"generated_text": …}
             if isinstance(result, str):
@@ -216,6 +216,7 @@ def run_evaluation(csv_path,
 
 
 
-def load_opencoder_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7, cot=False, rerank_initial=False, rerank_refined=False, use_naive=False):
-    return OpenCoder(load_generation_pipeline(model_name, batch_size=8, max_input_tokens=2048, max_new_tokens=256, temperature=0.7), use_cot=cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined, use_naive=use_naive)
+def load_opencoder_generation_pipeline(model_name, base_pipeline):
+    ## DO NOT INITIALIZE ANOTHER PIPELINE, ADDING TOO MUCH BLOAT
+    return OpenCoder(base_pipeline)
 
