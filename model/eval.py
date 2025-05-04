@@ -8,7 +8,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import math
 
 
-from open_coder import OpenCoder
+from model.open_coder import OpenCoder
 
 # Increase CSV field size limit to handle large fields
 csv.field_size_limit(sys.maxsize)
