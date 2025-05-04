@@ -14,7 +14,7 @@ if __name__ == "__main__":
                         default="Qwen/Qwen1.5-7B-Chat",
                         help="Model name or path for text generation")
     parser.add_argument("--csv", type=str,
-                        default="../dataset/coderepoqa_python.csv",
+                        default="./dataset/coderepoqa_python.csv",
                         help="Path to the CSV file with 'question' and 'answer' columns")
     parser.add_argument("--batch_size", type=int,
                         default=8,
