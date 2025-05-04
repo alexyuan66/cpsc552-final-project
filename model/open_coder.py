@@ -1,8 +1,8 @@
 from collections.abc import Callable
 
-from prompts import *
+from model.prompts import *
 
-from rag import RAG
+from model.rag import RAG
 
 
 class OpenCoder:
