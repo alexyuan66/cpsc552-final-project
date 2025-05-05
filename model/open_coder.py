@@ -6,6 +6,12 @@ from model.rag import RAG
 import re
 
 
+from collections import defaultdict
+
+class SafeDict(defaultdict):
+    def __missing__(self, key):
+        return f"{{{key}}}"
+
 def escape_curly_braces(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
@@ -33,12 +39,12 @@ class OpenCoder:
             out_arr = [x[0]["generated_text"] for x in out]
             responses.append(out_arr)
 
+        safe_values = lambda ra, rb: SafeDict(str, {
+            "response_a": ra,
+            "rasponse_b": rb,
+        })
         rerank_prompts = [
-            s.format(
-                response_a=escape_curly_braces(ra),
-                response_b=escape_curly_braces(rb),
-                answer="{answer}",
-            )
+            s.format_map(safe_values(ra,rb))
             for s, ra, rb in zip(rerank_prompt_templates, responses[0], responses[1])
         ]
         reranked_out = self.pipeline(rerank_prompts)
@@ -75,14 +81,12 @@ class OpenCoder:
             for q, r in zip(queries, rag_data)
         ]
         if rerank_initial:
+            safe_values = lambda q, r: SafeDict(str, {
+                "query": q,
+                "rag_data": escape_curly_braces(r),
+            })
             rerank_prompt_templates = [
-                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format(
-                    query=q,
-                    rag_data=escape_curly_braces(r),
-                    response_a="{response_a}",
-                    response_b="{response_b}",
-                    answer="{answer}",
-                )
+                RERANKER_GENERATE_BETTER_RESPONSE_PROMPT.format_map(safe_values(q,r))
                 for q, r in zip(queries, rag_data)
             ]
 
@@ -110,12 +114,14 @@ class OpenCoder:
             for q, ir, fb, r in zip(queries, initial, feedback, rag_data)
         ]
         if rerank_refined:
+            safe_values = lambda q, r, ir, fb: SafeDict(str, {
+                "query": q,
+                "rag_data": escape_curly_braces(r),
+                "initial_response": ir,
+                "feedback": fb,
+            })
             rerank_prompts = [
-                RERANKER_GENERATE_BETTER_REFINED_PROMPT.format(query=q, rag_data=r, initial_response=ir, feedback = fb,
-                    response_a="{response_a}",
-                    response_b="{response_b}",
-                    answer="{answer}",
-                )
+                RERANKER_GENERATE_BETTER_REFINED_PROMPT.format_map(safe_values(q, r, ir, fb))
                 for q, r, ir, fb in zip(queries, rag_data, initial, feedback)
             ]
             ref_out_final = self._rerank_2(ref_prompts, rerank_prompts)
