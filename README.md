@@ -8,6 +8,17 @@ OpenCoder, is a lightweight RAG pipeline designed to enhance LLM performance on 
 
 ---
 
+## Notice
+
+All development for this project was done on the Yale Mccleary Cluster with the following settings
+* Number of CPU cores per node: 1
+* Memory per CPU core in GiB: 45
+* Partitions: gpu_devel
+* Number of GPUs per node: 2
+* GPU: NVIDIA GeForce RTX 3090
+
+---
+
 ## Dependencies
 
 For convenience, we have created a `env.yml` file that can be run to install all but one required dependencies with the following command, creating the opencoder_env environment: 
@@ -89,24 +100,32 @@ All models are automatically downloaded from the Hugging Face Hub within our cod
 1. **Run evaluation script:**
 
    ```bash
-   python3 main.py --limit 800 > results.txt
+   python3 main.py --limit 800 --opencoder
    ```
 
-   TODO: ADD SAMPLE QUERIES
-
    Further Customizable Flags:
-   * `--batch_size`: number of questions processed in parallel (GPU only)
-   * `--baseline`: baseline model (cannot be run with the customizable flags below)
-   * `--semantic_rag`: enhance model with Semantic RAG
-   * `--keyword_rag`: enhance model with Keyword RAG (cannot be run with Semantic RAG)
-   * `--cot`: enhance model with CoT (assumes some RAG flag has been set)
-   * `--rerank_initial`: enhance model with output reranking in the draft stage (assumes some RAG flag has been set)
-   * `--rerank_refined`: enhance model with output reranking in the refinement stage (assumes some RAG flag has been set)
+   * `--limit [LIMIT]`: number of questions to evaluate model on
+   * `--batch_size [BATCH SIZE]`: number of questions processed in parallel (GPU only)
+   * `--opencoder`: use opencoder framework (must include to run with the customizable flags below). If absent, uses baseline model.
+   * `--rag [semantic|keyword]`: enhance model with either semantic or keyword RAG. Default semantic.
+   * `--cot`: enhance model with CoT
+   * `--rerank [initial|refined]`: enhance model with output reranking, either in the draft stage or after the feedeback stage. Default None.
+
+    Examples:
+
+      * Keyword RAG:
+        ```bash
+        python3 main.py --limit 800 --opencoder --rag keyword
+        ```
+      * Use CoT:
+        ```bash
+        python3 main.py --limit 800 --opencoder --cot
+        ```
+      * Use CoT and reranking refined
+        ```bash
+        python3 main.py --limit 800 --opencoder --cot --rerank refined
+        ```
 
 2. **Output:**
    * The script prints inference progress and final metrics (including LLM-judge score, BLEU, ROUGE-1, ROUGE-L, and edit distance scores).
-   * Results are saved to `results.txt` if redirected.
-
-
-
 
