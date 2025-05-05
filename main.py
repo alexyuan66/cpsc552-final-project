@@ -32,32 +32,24 @@ if __name__ == "__main__":
     parser.add_argument("--rerank", choices=['initial', 'refined'],
                         default=None,
                         help="Choose 'initial' for rerank after initial generation or 'refined' for rerank after refined response. default none")
-    parser.add_argument("--sample_query", action='store_true',
-                        help="run a sample query")
     args = parser.parse_args()
 
     print('Loading base generation pipeline...')
     base_pipeline = load_generation_pipeline(args.model, batch_size=args.batch_size)
 
-    if args.sample_query:
-        eval_pipeline = load_opencoder_generation_pipeline(base_pipeline, limit=args.limit)
-        example = "How to fix python index out of bound error?"
-        print(f'\nRunning sample query: {example}')
-        output = eval_pipeline([example], use_cot=True, rerank_refined=True)
-        print(f"Opencoder output: {output}")
-    else:
-        print('Loading judge pipeline...')
-        judge_pipeline = load_generation_pipeline(args.judge_model, batch_size=args.batch_size)
+    print('Loading judge pipeline...')
+    judge_pipeline = load_generation_pipeline(args.judge_model, batch_size=args.batch_size)
 
-        eval_pipeline = base_pipeline
-        if args.opencoder:
-            print('loading opencoder generation pipeline...')
-            eval_pipeline = load_opencoder_generation_pipeline(base_pipeline, limit=args.limit)
+    eval_pipeline = base_pipeline
+    model_name = "OpenCoder (" if args.opencoder else "baseline..."
+    if args.opencoder:
+        print('loading opencoder generation pipeline...')
+        eval_pipeline = load_opencoder_generation_pipeline(base_pipeline, limit=args.limit)
 
         r_init_flag = args.rerank == 'initial'
         r_ref_flag = args.rerank == 'refined'
         use_naive_rag = args.rag == 'keyword'
-        model_name = "OpenCoder (" if args.opencoder else "baseline"
+        
         model_name += ("with cot" if args.cot else "no cot")
         model_name += (", keyword rag" if use_naive_rag else ", semantic rag")
         if r_init_flag:
@@ -65,6 +57,10 @@ if __name__ == "__main__":
         if r_ref_flag:
             model_name += ", rerank refined"
         model_name += ")..."
-        
-        print(f'\nRunning batched evaluation on {model_name}')
+
+    print(f'\nRunning batched evaluation on {model_name}')
+    if args.opencoder:
         run_evaluation(args.csv, eval_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline, rerank_initial=r_init_flag, rerank_refined=r_ref_flag, use_cot=args.cot, use_naive=use_naive_rag)
+    else:
+        run_evaluation(args.csv, eval_pipeline, batch_size=args.batch_size, limit=args.limit, judge_pipeline=judge_pipeline, baseline=True)
+

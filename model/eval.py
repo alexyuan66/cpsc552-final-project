@@ -158,7 +158,9 @@ def run_evaluation(csv_path,
                    batch_size=8,
                    limit=None,
                    judge_pipeline=None,
-                   judge_prompt=DEFAULT_JUDGE_PROMPT, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
+                   judge_prompt=DEFAULT_JUDGE_PROMPT, 
+                   baseline=False,
+                   use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
     """
     Generate answers and (optionally) have an LLM judge rate them.
     """
@@ -182,7 +184,10 @@ def run_evaluation(csv_path,
         batch = questions[start:end]
         print(f"Processing questions {start+1}–{end} / {total}")
 
-        batch_out = gen_pipeline(batch, use_cot=use_cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined, use_naive=use_naive)
+        if baseline:
+            batch_out = gen_pipeline(batch)
+        else:
+            batch_out = gen_pipeline(batch, use_cot=use_cot, rerank_initial=rerank_initial, rerank_refined=rerank_refined, use_naive=use_naive)
         for result in batch_out:
             # Accept: "answer", [{"generated_text": …}], or {"generated_text": …}
             if isinstance(result, str):

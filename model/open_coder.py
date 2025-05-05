@@ -15,6 +15,9 @@ class SafeDict(defaultdict):
 def escape_curly_braces(text: str) -> str:
     return text.replace("{", "{{").replace("}", "}}")
 
+def delete_curly_braces(text: str) -> str:
+    return text.replace("{", "left curly brace").replace("}", "right curly brace")
+
 class OpenCoder:
     def __init__(self, pipeline: Callable, limit=None):
         """
@@ -29,10 +32,11 @@ class OpenCoder:
         # Accept str or list[str] so run_evaluation can pass a batch
         if isinstance(queries, str):
             return self._generate_one(queries, max_feedback)
-        return self._generate_batch(list(map(escape_curly_braces, queries)), max_feedback, use_cot, rerank_initial, rerank_refined, use_naive)
+        return self._generate_batch(list(map(delete_curly_braces, queries)), max_feedback, use_cot, rerank_initial, rerank_refined, use_naive)
 
     # ask model to generate 2 repsonses and decide which among them is better
     def _rerank_2(self, prompts, rerank_prompt_templates):
+        rerank_prompt_templates_clean = rerank_prompt_templates
         responses = []
         for i in range(2):
             out = self.pipeline(prompts)
@@ -40,12 +44,12 @@ class OpenCoder:
             responses.append(out_arr)
 
         safe_values = lambda ra, rb: SafeDict(str, {
-            "response_a": ra,
-            "rasponse_b": rb,
+            "response_a": delete_curly_braces(ra),
+            "response_b": delete_curly_braces(rb),
         })
         rerank_prompts = [
             s.format_map(safe_values(ra,rb))
-            for s, ra, rb in zip(rerank_prompt_templates, responses[0], responses[1])
+            for s, ra, rb in zip(rerank_prompt_templates_clean, responses[0], responses[1])
         ]
         reranked_out = self.pipeline(rerank_prompts)
         better_responses_ind = [x[0]["generated_text"] for x in reranked_out]
@@ -73,6 +77,7 @@ class OpenCoder:
     def _generate_batch(self, queries, max_feedback=5, use_cot: bool = False, rerank_initial: bool = False, rerank_refined: bool = False, use_naive: bool = False):
         # 1 · RAG retrieval for every question
         rag_data = self.rag.retrieve_batch(queries) if not use_naive else self.rag.retrieve_batch_naive(queries)
+        rag_data = [delete_curly_braces(r) for r in rag_data]
 
         # 2 · Initial answers (single GPU call)
         init_prompts = [
@@ -117,8 +122,8 @@ class OpenCoder:
             safe_values = lambda q, r, ir, fb: SafeDict(str, {
                 "query": q,
                 "rag_data": escape_curly_braces(r),
-                "initial_response": ir,
-                "feedback": fb,
+                "initial_response": delete_curly_braces(ir),
+                "feedback": delete_curly_braces(fb),
             })
             rerank_prompts = [
                 RERANKER_GENERATE_BETTER_REFINED_PROMPT.format_map(safe_values(q, r, ir, fb))
