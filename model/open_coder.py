@@ -29,7 +29,7 @@ class OpenCoder:
         # Accept str or list[str] so run_evaluation can pass a batch
         if isinstance(queries, str):
             return self._generate_one(queries, max_feedback)
-        return self._generate_batch(queries, max_feedback, use_cot, rerank_initial, rerank_refined, use_naive)
+        return self._generate_batch(list(map(escape_curly_braces, queries)), max_feedback, use_cot, rerank_initial, rerank_refined, use_naive)
 
     # ask model to generate 2 repsonses and decide which among them is better
     def _rerank_2(self, prompts, rerank_prompt_templates):
@@ -60,11 +60,11 @@ class OpenCoder:
                 elif letter == 'B':
                     final_out.append(responses[1][i])
                 else:
-                    print(f"ERROR: Reranker response \\boxed{{{letter}}} does not match expected format of A or B")
+                    # print(f"ERROR: Reranker response \\boxed{{{letter}}} does not match expected format of A or B")
                     final_out.append(responses[0][i])
             else:
-                print("Neither \\boxed{A} nor \\boxed{B} found")
-                print(f"LLM out: {better}")
+                # print("Neither \\boxed{A} nor \\boxed{B} found")
+                # print(f"LLM out: {better}")
                 final_out.append(responses[0][i])
 
         return final_out

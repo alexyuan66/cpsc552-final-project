@@ -163,7 +163,7 @@ def run_evaluation(csv_path,
     Generate answers and (optionally) have an LLM judge rate them.
     """
 
-    df = pd.read_csv(csv_path, encoding="utf-8", on_bad_lines="skip", nrows=100)
+    df = pd.read_csv(csv_path, encoding="utf-8", on_bad_lines="skip", nrows=800)
     questions      = df["question"].fillna("").tolist()
     ground_truths  = df["answer"].fillna("").tolist()
 

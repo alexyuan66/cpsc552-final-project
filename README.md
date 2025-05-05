@@ -10,13 +10,25 @@ OpenCoder, is a lightweight RAG pipeline designed to enhance LLM performance on 
 
 ## Dependencies
 
-For convenience, we have created an `env.yml` file that can be run to install all required dependencies with the following command, creating the opencoder_env environment:
+For convenience, we have created a `env.yml` file that can be run to install all but one required dependencies with the following command, creating the opencoder_env environment: 
 
 ```bash
 conda env create -f env.yml
 ```
 
-At a glance, this will create an environment with the following, which can be separately installed with pip an environment is undesired:
+Then, activate the environment with:
+
+```bash
+conda activate opencoder_env
+```
+
+Finally, run the following command for GPU acceleration:
+
+```bash
+pip install accelerate
+```
+
+At a glance, this will create an environment with the following:
 * python=3.10
 * pytorch
 * cudatoolkit=12.1

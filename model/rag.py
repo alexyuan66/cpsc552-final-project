@@ -26,7 +26,7 @@ class RAG:
 
         # Preprocess everything
         self.df['text'] = self.df['question_title'].fillna('') + " " + self.df['question_body'].fillna('') # concatenates question and body
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.model = SentenceTransformer('all-MiniLM-L6-v2', device='cuda')
 
         # Encode questions
         print("Encoding all questions...")
