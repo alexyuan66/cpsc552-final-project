@@ -21,7 +21,7 @@ All development for this project was done on the Yale Mccleary Cluster with the 
 
 ## Dependencies
 
-For convenience, we have created a `env.yml` file that can be run to install all but one required dependencies with the following command, creating the opencoder_env environment: 
+For convenience, we have created a `env.yml` file that can be run to install all but one required dependency with the following command, creating the opencoder_env environment: 
 
 ```bash
 conda env create -f env.yml
