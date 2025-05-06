@@ -41,16 +41,15 @@ pip install accelerate
 
 At a glance, this will create an environment with the following:
 * python=3.10
-* pytorch
-* cudatoolkit=12.1
-* faiss-gpu
+* pytorch-cuda
+* accelerate
+* faiss-cpu
 * sentence-transformers
 * nltk
 * pandas
 * transformers
 * rouge-score
 * python-levenshtein
-* accelerate
 
 ---
 
